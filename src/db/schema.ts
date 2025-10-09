@@ -94,3 +94,9 @@ export const demoData = sqliteTable("demo_data", {
   limit: integer("limit").notNull(),
   reviewer: text("reviewer").notNull(),
 });
+
+export const qaData = sqliteTable("qa_Data", {
+  id: integer("id").primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull()
+});
