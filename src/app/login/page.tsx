@@ -93,13 +93,6 @@ export default function LoginPage() {
             <Link href="/terms">Terms of Service</Link> and{" "}
             <Link href="/privacy">Privacy Policy</Link>.
           </FieldDescription>
-          <Field>
-            <Link href="/terms">
-              <Button type="submit">
-                TEST
-              </Button>
-            </Link>
-          </Field>
         </div>
       </div>
     </div>
