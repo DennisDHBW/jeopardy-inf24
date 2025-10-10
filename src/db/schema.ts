@@ -94,3 +94,8 @@ export const demoData = sqliteTable("demo_data", {
   limit: integer("limit").notNull(),
   reviewer: text("reviewer").notNull(),
 });
+
+export const categoriesTable = sqliteTable("categories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+});
