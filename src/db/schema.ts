@@ -1,5 +1,5 @@
-import { sql } from "drizzle-orm";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { relations, sql } from "drizzle-orm";
+import { sqliteTable, text, uniqueIndex, integer } from "drizzle-orm/sqlite-core";
 
 /**
  * Authentication schema.
@@ -95,8 +95,174 @@ export const demoData = sqliteTable("demo_data", {
   reviewer: text("reviewer").notNull(),
 });
 
-export const categoriesTable = sqliteTable("categories", {
+export const categories = sqliteTable(
+  "categories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => ({
+    nameUnique: uniqueIndex("categories_name_unique").on(t.name),
+  }),
+);
+
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  questions: many(questions),
+  roundCategories: many(roundCategories),
+}));
+
+// --------------------
+// Fragen (Clues)
+// --------------------
+export const questions = sqliteTable("questions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
+  categoryId: integer("category_id").notNull().references(() => categories.id, {
+    onDelete: "cascade",
+  }),
+  prompt: text("prompt").notNull(),
+  answer: text("answer").notNull(),
+  value: integer("value").notNull(),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 });
+
+export const questionsRelations = relations(questions, ({ one, many }) => ({
+  category: one(categories, {
+    fields: [questions.categoryId],
+    references: [categories.id],
+  }),
+  roundClues: many(roundClues),
+}));
+
+// --------------------
+// Games (optional)
+// --------------------
+export const games = sqliteTable("games", {
+  id: text("id").primaryKey(), // UUID als Text
+  status: text("status").notNull().default("active"),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+export const gamesRelations = relations(games, ({ many }) => ({
+  rounds: many(rounds),
+}));
+
+// --------------------
+// Rounds
+// --------------------
+export const rounds = sqliteTable("rounds", {
+  id: text("id").primaryKey(), // UUID als Text
+  gameId: text("game_id").references(() => games.id, { onDelete: "set null" }),
+  roundNumber: integer("round_number").notNull().default(1),
+  status: text("status").notNull().default("open"),
+  seed: text("seed"),
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+export const roundsRelations = relations(rounds, ({ one, many }) => ({
+  game: one(games, { fields: [rounds.gameId], references: [games.id] }),
+  roundCategories: many(roundCategories),
+  roundClues: many(roundClues),
+}));
+
+// --------------------
+// Round -> Kategorien (6 Spalten eingefroren)
+// --------------------
+export const roundCategories = sqliteTable(
+  "round_categories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    roundId: text("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    categoryId: integer("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
+    columnIndex: integer("column_index").notNull(), // 0..5
+  },
+  (t) => ({
+    uniqRoundColumn: uniqueIndex("round_categories_round_col_unique").on(
+      t.roundId,
+      t.columnIndex,
+    ),
+    uniqRoundCategory: uniqueIndex("round_categories_round_cat_unique").on(
+      t.roundId,
+      t.categoryId,
+    ),
+  }),
+);
+
+export const roundCategoriesRelations = relations(
+  roundCategories,
+  ({ one }) => ({
+    round: one(rounds, {
+      fields: [roundCategories.roundId],
+      references: [rounds.id],
+    }),
+    category: one(categories, {
+      fields: [roundCategories.categoryId],
+      references: [categories.id],
+    }),
+  }),
+);
+
+// --------------------
+// Round -> Clues (5 Zeilen je Spalte eingefroren)
+// --------------------
+export const roundClues = sqliteTable(
+  "round_clues",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    roundId: text("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    questionId: integer("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "restrict" }),
+    columnIndex: integer("column_index").notNull(), // 0..5 (zugehörige Spalte)
+    rowIndex: integer("row_index").notNull(), // 0..4 (Zeile/Punktehöhe)
+    revealed: integer("revealed").notNull().default(0), // 0/1
+    answered: integer("answered").notNull().default(0), // 0/1
+    answeredAt: text("answered_at"),
+  },
+  (t) => ({
+    uniqCell: uniqueIndex("round_clues_round_col_row_unique").on(
+      t.roundId,
+      t.columnIndex,
+      t.rowIndex,
+    ),
+    uniqQuestionInRound: uniqueIndex("round_clues_round_question_unique").on(
+      t.roundId,
+      t.questionId,
+    ),
+  }),
+);
+
+export const roundCluesRelations = relations(roundClues, ({ one }) => ({
+  round: one(rounds, { fields: [roundClues.roundId], references: [rounds.id] }),
+  question: one(questions, {
+    fields: [roundClues.questionId],
+    references: [questions.id],
+  }),
+}));
+
+// --------------------
+// Abgeleitete Typen
+// --------------------
+export type Category = typeof categories.$inferSelect;
+export type NewCategory = typeof categories.$inferInsert;
+
+export type Question = typeof questions.$inferSelect;
+export type NewQuestion = typeof questions.$inferInsert;
+
+export type Game = typeof games.$inferSelect;
+export type NewGame = typeof games.$inferInsert;
+
+export type Round = typeof rounds.$inferSelect;
+export type NewRound = typeof rounds.$inferInsert;
+
+export type RoundCategory = typeof roundCategories.$inferSelect;
+export type NewRoundCategory = typeof roundCategories.$inferInsert;
+
+export type RoundClue = typeof roundClues.$inferSelect;
+export type NewRoundClue = typeof roundClues.$inferInsert;

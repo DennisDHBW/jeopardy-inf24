@@ -1,14 +1,37 @@
 "use client";
 
-import { useActionState } from "react";
-import { createRoundAction } from "@/actions/newgame";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import type { Route } from "next";
+import { createRoundAction } from "@/actions/rounds/create-round";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
+type State = {
+  ok: boolean;
+  error: string;
+  name?: string;
+  roundId?: string;
+};
+
 export default function NewGamePage() {
-  const [state, formAction, pending] = useActionState(createRoundAction, {});
+  const router = useRouter();
+
+  const [state, formAction, pending] = useActionState<State, FormData>(
+    createRoundAction,
+    { ok: false, error: "", name: undefined, roundId: undefined },
+  );
+
+  // Variante B: nach Erfolg clientseitig navigieren
+  useEffect(() => {
+    if (state?.ok && typeof state.roundId === "string") {
+      const href = `/rounds/${state.roundId}` as Route;
+      router.push(href);
+    }
+  }, [state?.ok, state?.roundId, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -28,7 +51,7 @@ export default function NewGamePage() {
                 {pending ? "Erstelle…" : "Neue Runde"}
               </Button>
 
-              {/* ▶️ Ausgabe NACH der Server Action */}
+              {/* Fallback-Ausgabe */}
               {state?.ok && (
                 <FieldDescription className="text-center">
                   Runde erstellt: <span className="font-semibold">{state.name}</span> (ID: {state.roundId})
