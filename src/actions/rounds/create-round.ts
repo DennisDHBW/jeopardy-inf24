@@ -55,7 +55,10 @@ export async function createRoundAction(
   try {
     await db.transaction(async (tx) => {
       // 1) Runde anlegen
-      await tx.insert(rounds).values({ id: roundId });
+      await tx.insert(rounds).values({ 
+        id: roundId,
+        gameId: name,
+      });
 
       // 2) 6 zufällige Kategorien
       const sixCats = await tx

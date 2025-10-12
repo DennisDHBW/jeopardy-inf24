@@ -29,6 +29,7 @@ type BoardClue = {
 
 export type RoundBoardData = {
   roundId: string;
+  gameId: string;
   status: string;
   categories: BoardCategory[];
   clues: BoardClue[];
@@ -75,6 +76,7 @@ async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
 
   return {
     roundId,
+    gameId: r.gameId,
     status: r.status,
     categories: cats,
     clues,
@@ -94,7 +96,7 @@ export default async function RoundPage({ params }: PageProps) {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-2">Runde {data.roundId}</h1>
+      <h1 className="text-2xl font-semibold mb-2">Runde: {data.gameId}</h1>
       <p className="text-muted-foreground mb-6">Status: {data.status}</p>
       <JeopardyBoard data={data} />
     </div>

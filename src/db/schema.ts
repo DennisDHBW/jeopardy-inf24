@@ -152,7 +152,7 @@ export const gamesRelations = relations(games, ({ many }) => ({
 // --------------------
 export const rounds = sqliteTable("rounds", {
   id: text("id").primaryKey(), // UUID als Text
-  gameId: text("game_id").references(() => games.id, { onDelete: "set null" }),
+  gameId: text("game_id").notNull().default("default"),
   roundNumber: integer("round_number").notNull().default(1),
   status: text("status").notNull().default("open"),
   seed: text("seed"),
