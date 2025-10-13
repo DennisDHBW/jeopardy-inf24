@@ -11,8 +11,10 @@ import {
   roundClues,
   categories,
   questions,
+  roundPlayers,
 } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "@/lib/auth-server";
 
 const CreateRoundSchema = z.object({
   name: z.string().trim().min(1, "Bitte einen Namen angeben.").max(100),
@@ -29,6 +31,16 @@ export async function createRoundAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const session = await getServerSession();
+  const userId = session?.user?.id;
+
+  if (typeof userId !== "string" || userId.length === 0) {
+    return {
+      ok: false,
+      error: "Bitte melde dich an, um eine Runde zu erstellen.",
+    };
+  }
+
   const parsed = CreateRoundSchema.safeParse({
     name: formData.get("name"),
   });
@@ -60,6 +72,13 @@ export async function createRoundAction(
         gameId: name,
       });
 
+      // Host direkt als Teilnehmer anlegen
+      await tx.insert(roundPlayers).values({
+        roundId,
+        userId,
+        role: "host",
+      });
+
       // 2) 6 zufällige Kategorien
       const sixCats = await tx
         .select({ id: categories.id })
@@ -78,7 +97,13 @@ export async function createRoundAction(
 
       // 4) Pro Kategorie GENAU 1 Frage je Wertstufe (100..500), zufällig
       for (let col = 0; col < sixCats.length; col++) {
-        const catId = sixCats[col]!.id;
+        const categoryEntry = sixCats[col];
+
+        if (!categoryEntry) {
+          throw new Error("Unerwarteter Fehler beim Ermitteln der Kategorien.");
+        }
+
+        const catId = categoryEntry.id;
 
         // Für jede Stufe 100..500 genau eine Frage ziehen
         const picked: { questionId: number; rowIndex: number }[] = [];
@@ -101,7 +126,14 @@ export async function createRoundAction(
             );
           }
 
-          picked.push({ questionId: q[0]!.id, rowIndex: i }); // i = 0..4 → 100..500
+          const question = q[0];
+          if (!question) {
+            throw new Error(
+              `Kategorie ${catId} hat keine Frage mit Wert ${value}.`,
+            );
+          }
+
+          picked.push({ questionId: question.id, rowIndex: i }); // i = 0..4 → 100..500
         }
 
         // round_clues für diese Kategorie eintragen

@@ -159,12 +159,6 @@ export const rounds = sqliteTable("rounds", {
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 });
 
-export const roundsRelations = relations(rounds, ({ one, many }) => ({
-  game: one(games, { fields: [rounds.gameId], references: [games.id] }),
-  roundCategories: many(roundCategories),
-  roundClues: many(roundClues),
-}));
-
 // --------------------
 // Round -> Kategorien (6 Spalten eingefroren)
 // --------------------
@@ -247,6 +241,49 @@ export const roundCluesRelations = relations(roundClues, ({ one }) => ({
 }));
 
 // --------------------
+// Round -> Players
+// --------------------
+export const roundPlayers = sqliteTable(
+  "round_players",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    roundId: text("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("player"),
+    score: integer("score").notNull().default(0),
+    joinedAt: text("joined_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  },
+  (t) => ({
+    uniqRoundUser: uniqueIndex("round_players_round_user_unique").on(
+      t.roundId,
+      t.userId,
+    ),
+  }),
+);
+
+export const roundPlayersRelations = relations(roundPlayers, ({ one }) => ({
+  round: one(rounds, {
+    fields: [roundPlayers.roundId],
+    references: [rounds.id],
+  }),
+  participant: one(user, {
+    fields: [roundPlayers.userId],
+    references: [user.id],
+  }),
+}));
+
+export const roundsRelations = relations(rounds, ({ one, many }) => ({
+  game: one(games, { fields: [rounds.gameId], references: [games.id] }),
+  roundCategories: many(roundCategories),
+  roundClues: many(roundClues),
+  roundPlayers: many(roundPlayers),
+}));
+
+// --------------------
 // Abgeleitete Typen
 // --------------------
 export type Category = typeof categories.$inferSelect;
@@ -266,3 +303,6 @@ export type NewRoundCategory = typeof roundCategories.$inferInsert;
 
 export type RoundClue = typeof roundClues.$inferSelect;
 export type NewRoundClue = typeof roundClues.$inferInsert;
+
+export type RoundPlayer = typeof roundPlayers.$inferSelect;
+export type NewRoundPlayer = typeof roundPlayers.$inferInsert;

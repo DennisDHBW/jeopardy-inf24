@@ -5,9 +5,17 @@ import {
   roundClues,
   categories,
   questions,
+  roundPlayers,
+  user as users,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getServerSession } from "@/lib/auth-server";
 import JeopardyBoard from "./_components/jeopardy-board";
+import { JoinRoundForm } from "./_components/join-round-form";
+import {
+  ParticipantsPanel,
+  type RoundParticipantView,
+} from "./_components/participants-panel";
 
 type BoardCategory = {
   columnIndex: number;
@@ -38,7 +46,8 @@ export type RoundBoardData = {
 async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
   const rArr = await db.select().from(rounds).where(eq(rounds.id, roundId)).limit(1);
   if (rArr.length === 0) return null;
-  const r = rArr[0]!;
+  const r = rArr[0];
+  if (!r) return null;
 
   const cats = await db
     .select({
@@ -83,21 +92,73 @@ async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
   };
 }
 
+async function getRoundParticipants(
+  roundId: string,
+): Promise<RoundParticipantView[]> {
+  const participants = await db
+    .select({
+      userId: roundPlayers.userId,
+      role: roundPlayers.role,
+      score: roundPlayers.score,
+      name: users.name,
+    })
+    .from(roundPlayers)
+    .leftJoin(users, eq(users.id, roundPlayers.userId))
+    .where(eq(roundPlayers.roundId, roundId))
+    .orderBy(roundPlayers.joinedAt);
+
+  return participants;
+}
+
 // ⬇️ params ist ein Promise in Next 15
 type PageProps = { params: Promise<{ roundId: string }> };
 
 export default async function RoundPage({ params }: PageProps) {
   const { roundId } = await params;   // ⬅️ erst awaiten
-  const data = await getBoardData(roundId);
+  const [session, data, participants] = await Promise.all([
+    getServerSession(),
+    getBoardData(roundId),
+    getRoundParticipants(roundId),
+  ]);
 
   if (!data) {
     return <div className="p-6">Runde {roundId} nicht gefunden.</div>;
   }
 
+  const currentUserId = session?.user?.id ?? null;
+  const alreadyJoined = typeof currentUserId === "string"
+    ? participants.some((p) => p.userId === currentUserId)
+    : false;
+  const playerName =
+    typeof session?.user?.name === "string" ? session.user.name : null;
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-2">Runde: {data.gameId}</h1>
-      <p className="text-muted-foreground mb-6">Status: {data.status}</p>
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold mb-2">Runde: {data.gameId}</h1>
+          <p className="text-muted-foreground">
+            Status: {data.status} • Code:{" "}
+            <span className="font-mono text-foreground">{roundId}</span>
+          </p>
+          {playerName && (
+            <p className="text-muted-foreground text-sm mt-2">
+              Angemeldet als <span className="font-medium">{playerName}</span>
+            </p>
+          )}
+        </div>
+        <JoinRoundForm
+          roundId={roundId}
+          isAuthenticated={typeof currentUserId === "string"}
+          alreadyJoined={alreadyJoined}
+        />
+      </div>
+
+      <ParticipantsPanel
+        participants={participants}
+        currentUserId={currentUserId}
+      />
+
       <JeopardyBoard data={data} />
     </div>
   );
