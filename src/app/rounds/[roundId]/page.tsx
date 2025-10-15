@@ -119,13 +119,15 @@ export default async function RoundPage({ params }: PageProps) {
     getServerSession(),
     getBoardData(roundId),
     getRoundParticipants(roundId),
-  ]);
+  ])
 
   if (!data) {
     return <div className="p-6">Runde {roundId} nicht gefunden.</div>;
   }
 
   const currentUserId = session?.user?.id ?? null;
+  const currentParticipant = participants.find(p => p.userId === currentUserId);
+  const currentRole = currentParticipant?.role ?? "player";
   const alreadyJoined = typeof currentUserId === "string"
     ? participants.some((p) => p.userId === currentUserId)
     : false;
@@ -159,7 +161,7 @@ export default async function RoundPage({ params }: PageProps) {
         currentUserId={currentUserId}
       />
 
-      <JeopardyBoard data={data} />
+      <JeopardyBoard data={data} role={currentRole}/>
     </div>
   );
 }

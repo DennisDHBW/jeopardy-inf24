@@ -46,17 +46,29 @@ function ValueTile({
   prompt,
   answer,
   disabled,
+  role,
 }: {
   value: number;
   categoryName: string;
   prompt?: string;
   answer?: string;
   disabled?: boolean;
+  role?: "host" | "player" | "spectator";
 }) {
   // Wenn mal eine Stufe fehlt, zeigen wir eine deaktivierte Kachel
   if (disabled) {
     return (
       <Card className={`${TILE_CARD_CLS} opacity-50 pointer-events-none`}>
+        <CardContent className="h-20 grid place-items-center">
+          <span className={TILE_VALUE_CLS}>${value}</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (role !== "host") {
+    return (
+      <Card className={`${TILE_CARD_CLS} cursor-not-allowed`}>
         <CardContent className="h-20 grid place-items-center">
           <span className={TILE_VALUE_CLS}>${value}</span>
         </CardContent>
@@ -91,7 +103,7 @@ function ValueTile({
   );
 }
 
-export default function JeopardyBoard({ data }: { data: RoundBoardData }) {
+export default function JeopardyBoard({ data, role}: { data: RoundBoardData; role: "host" | "player" | "spectator"}) {
   const { categories, clues } = data;
 
   // Hilfszugriff: Frage anhand (categoryId, value) finden
@@ -124,6 +136,7 @@ export default function JeopardyBoard({ data }: { data: RoundBoardData }) {
                     prompt={q?.prompt}
                     answer={q?.answer}
                     disabled={!q} // falls eine Stufe in einer Kategorie fehlt
+                    role={role}
                   />
                 );
               })}
