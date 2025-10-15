@@ -16,9 +16,9 @@ import {
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "@/lib/auth-server";
 
-const CreateRoundSchema = z.object({
+/*const CreateRoundSchema = z.object({
   name: z.string().trim().min(1, "Bitte einen Namen angeben.").max(100),
-});
+});*/
 
 type ActionState = {
   ok: boolean;
@@ -41,7 +41,7 @@ export async function createRoundAction(
     };
   }
 
-  const parsed = CreateRoundSchema.safeParse({
+  /*const parsed = CreateRoundSchema.safeParse({
     name: formData.get("name"),
   });
 
@@ -52,7 +52,7 @@ export async function createRoundAction(
     };
   }
 
-  const { name } = parsed.data;
+  const { name } = parsed.data;*/
   const roundId = crypto.randomUUID();
 
   // Mindestens 6 Kategorien?
@@ -69,7 +69,7 @@ export async function createRoundAction(
       // 1) Runde anlegen
       await tx.insert(rounds).values({ 
         id: roundId,
-        gameId: name,
+        //gameId: name,
       });
 
       // Host direkt als Teilnehmer anlegen
@@ -153,7 +153,8 @@ export async function createRoundAction(
     revalidatePath("/", "layout");
 
     // Variante B: Client pusht danach auf /rounds/:id
-    return { ok: true, error: "", name, roundId };
+    //return { ok: true, error: "", name, roundId };
+    return { ok: true, error: "", roundId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unbekannter Fehler beim Erstellen der Runde.";
     return { ok: false, error: msg };

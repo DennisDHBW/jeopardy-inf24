@@ -46,11 +46,14 @@ export async function joinRoundAction(
   const roundExists = await db
     .select({ id: rounds.id })
     .from(rounds)
-    .where(eq(rounds.id, roundId))
+    .where(and(
+      eq(rounds.id, roundId),
+      eq(rounds.status, "open")
+    ))
     .limit(1);
 
   if (roundExists.length === 0) {
-    return { ok: false, error: "Diese Runde existiert nicht mehr." };
+    return { ok: false, error: "Diese Runde existiert nicht." };
   }
 
   const already = await db
