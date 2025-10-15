@@ -9,11 +9,6 @@ import {
 } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
-
-import {
-  SidebarMenuButton,
-} from "@/components/ui/sidebar";
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -103,14 +98,6 @@ export function UserProfile({
               <DropdownMenuItem>
                 <IconUserCircle />
                 Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconCreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
