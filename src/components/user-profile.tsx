@@ -124,6 +124,12 @@ export function UserProfile({
   }, [nameState]);
 
   useEffect(() => {
+    // Debug: log emailState for troubleshooting
+    try {
+      // eslint-disable-next-line no-console
+      console.debug("user-profile emailState changed", emailState);
+    } catch (_) {}
+
     if (emailState && (emailState as any).success) {
       (async () => {
         setOpenEmail(false);
@@ -140,6 +146,12 @@ export function UserProfile({
   }, [emailState]);
 
   useEffect(() => {
+    // Debug: log passState for troubleshooting
+    try {
+      // eslint-disable-next-line no-console
+      console.debug("user-profile passState changed", passState);
+    } catch (_) {}
+
     if (passState && (passState as any).success) {
       (async () => {
         setOpenPass(false);
@@ -177,14 +189,14 @@ export function UserProfile({
           <DropdownMenuTrigger asChild>
             <Button
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              variant="account"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={getDisplayImage()} alt={getDisplayName()} />
-                <AvatarFallback className="rounded-lg">{(getDisplayName()?.charAt(0) ?? "").toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="rounded-lg text-primary">{(getDisplayName()?.charAt(0) ?? "").toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{displayUser?.name}</span>
+                <span className="truncate font-medium text-primary">{displayUser?.name}</span>
                 <span className="text-muted-foreground truncate text-xs">{displayUser?.email}</span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
