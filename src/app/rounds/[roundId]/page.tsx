@@ -11,7 +11,6 @@ import {
 import { eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
 import JeopardyBoard from "./_components/jeopardy-board";
-import { JoinRoundForm } from "./_components/join-round-form";
 import {
   ParticipantsPanel,
   type RoundParticipantView,
@@ -62,7 +61,7 @@ async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
 
   const cluesRaw = await db
     .select({
-      categoryId: questions.categoryId,        // wichtig fürs Board
+      categoryId: questions.categoryId,
       columnIndex: roundClues.columnIndex,
       rowIndex: roundClues.rowIndex,
       questionId: roundClues.questionId,
@@ -136,22 +135,14 @@ export default async function RoundPage({ params }: PageProps) {
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold mb-2">Runde: {data.gameId}</h1>
+          <p className="text-muted-foreground"> 
+            Status: {data.status}
+          </p>
           <p className="text-muted-foreground">
-            Status: {data.status} • Code:{" "}
+            Code:{" "}
             <span className="font-mono text-foreground">{roundId}</span>
           </p>
-          {playerName && (
-            <p className="text-muted-foreground text-sm mt-2">
-              Angemeldet als <span className="font-medium">{playerName}</span>
-            </p>
-          )}
         </div>
-        <JoinRoundForm
-          roundId={roundId}
-          isAuthenticated={typeof currentUserId === "string"}
-          alreadyJoined={alreadyJoined}
-        />
       </div>
 
       <ParticipantsPanel
