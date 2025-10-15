@@ -279,23 +279,54 @@ export function UserProfile({
                       <DialogDescription>Upload a new profile picture.</DialogDescription>
                     </DialogHeader>
 
-                    <form action={avatarAction} encType="multipart/form-data" className="space-y-4">
-                      <input type="hidden" name="userId" value={getDisplayId()} />
-                            <div className="flex flex-col gap-2">
-                              <Label className="block">Choose image</Label>
-                              <Input className="w-full" type="file" name="avatar" accept="image/*" />
-                            </div>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        const form = e.currentTarget as HTMLFormElement;
+                        const fd = new FormData(form);
+                        fd.set("userId", getDisplayId());
 
-                      {avatarState?.error && (
-                        <div className="text-destructive mt-2">{String(avatarState.error)}</div>
-                      )}
+                        try {
+                          const res = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+                          const json = await res.json();
+                          if (!res.ok) {
+                            toast.error(json?.error ?? "Upload failed");
+                            return;
+                          }
+                          toast.success("Profile picture updated");
+                          // Update displayUser image from session endpoint
+                          try {
+                            const s = await getSession();
+                            const u = (s as any)?.data?.user ?? (s as any)?.user;
+                            if (u) setDisplayUser(u);
+                            else if (json?.url) {
+                              // fallback: directly update local state with returned url
+                              setDisplayUser((prev) => ({ ...(prev ?? {}), image: json.url } as any));
+                            }
+                            setOpenAvatar(false);
+                          } catch (_) {
+                            if (json?.url) setDisplayUser((prev) => ({ ...(prev ?? {}), image: json.url } as any));
+                            setOpenAvatar(false);
+                          }
+                        } catch (err) {
+                          toast.error(String((err as Error).message ?? "Upload failed"));
+                        }
+                      }}
+                      encType="multipart/form-data"
+                      className="space-y-4"
+                    >
+                      <input type="hidden" name="userId" value={getDisplayId()} />
+                      <div className="flex flex-col gap-2">
+                        <Label className="block">Choose image</Label>
+                        <Input className="w-full" type="file" name="avatar" accept="image/*" />
+                      </div>
 
                       <DialogFooter>
                         <DialogClose asChild>
                           <Button variant="ghost">Cancel</Button>
                         </DialogClose>
-                        <Button type="submit" disabled={avatarPending}>
-                          {avatarPending ? "Saving..." : "Save"}
+                        <Button type="submit">
+                          Save
                         </Button>
                       </DialogFooter>
                     </form>
