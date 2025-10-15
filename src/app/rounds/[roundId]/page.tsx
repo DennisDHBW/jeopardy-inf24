@@ -15,6 +15,8 @@ import {
   ParticipantsPanel,
   type RoundParticipantView,
 } from "./_components/participants-panel";
+import { RoundHeader } from "./_components/round-header";
+import { UserProfile } from "@/components/user-profile";
 
 type BoardCategory = {
   columnIndex: number;
@@ -106,7 +108,10 @@ async function getRoundParticipants(
     .where(eq(roundPlayers.roundId, roundId))
     .orderBy(roundPlayers.joinedAt);
 
-  return participants;
+  return participants.map((p) => ({
+    ...p,
+    role: p.role === "host" ? "host" : "player",
+  }));
 }
 
 // ⬇️ params ist ein Promise in Next 15
@@ -125,32 +130,38 @@ export default async function RoundPage({ params }: PageProps) {
   }
 
   const currentUserId = session?.user?.id ?? null;
-  const alreadyJoined = typeof currentUserId === "string"
-    ? participants.some((p) => p.userId === currentUserId)
-    : false;
   const playerName =
     typeof session?.user?.name === "string" ? session.user.name : null;
 
+  const userProfileData = {
+    name: session?.user?.name ?? playerName ?? "Gast",
+    email: session?.user?.email ?? "unknown@example.com",
+    avatar: session?.user?.image ?? "/avatars/shadcn.jpg",
+  };
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-muted-foreground"> 
-            Status: {data.status}
-          </p>
-          <p className="text-muted-foreground">
-            Code:{" "}
-            <span className="font-mono text-foreground">{roundId}</span>
-          </p>
+    <div className="bg-muted">
+      <div className="relative flex min-h-svh flex-col gap-6 bg-muted/20 p-6">
+        <RoundHeader status={data.status} roundId={roundId} />
+
+        <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
+          <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80 lg:h-full">
+            <ParticipantsPanel
+              participants={participants}
+              currentUserId={currentUserId}
+              className="h-full"
+            />
+          </aside>
+
+          <main className="flex-1 lg:flex lg:flex-col lg:justify-center">
+            <JeopardyBoard data={data} />
+          </main>
+        </div>
+
+        <div className="relative flex justify-start">
+          <UserProfile user={userProfileData} />
         </div>
       </div>
-
-      <ParticipantsPanel
-        participants={participants}
-        currentUserId={currentUserId}
-      />
-
-      <JeopardyBoard data={data} />
     </div>
   );
 }

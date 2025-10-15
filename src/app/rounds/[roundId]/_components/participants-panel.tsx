@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type RoundParticipantView = {
   userId: string;
@@ -12,26 +13,30 @@ export type RoundParticipantView = {
 type ParticipantsPanelProps = {
   participants: RoundParticipantView[];
   currentUserId?: string | null;
+  className?: string;
 };
 
 export function ParticipantsPanel({
   participants,
   currentUserId,
+  className,
 }: ParticipantsPanelProps) {
   const hasParticipants = participants.length > 0;
 
   return (
-    <Card className="border bg-card">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
+    <Card className={cn("border bg-card shadow-sm", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Users className="size-4" />
           Spielende
         </CardTitle>
-        <Badge variant="secondary">{participants.length}</Badge>
+        <Badge variant="secondary" className="text-sm">
+          {participants.length}
+        </Badge>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {hasParticipants ? (
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {participants.map((participant) => {
               const isCurrent = participant.userId === currentUserId;
               const label =
@@ -42,22 +47,25 @@ export function ParticipantsPanel({
               return (
                 <li
                   key={participant.userId}
-                  className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2"
+                  className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3"
                 >
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">
+                    <span className="text-base font-semibold text-foreground">
                       {label}
                       {isCurrent && (
-                        <span className="ml-2 text-xs text-primary font-semibold">
+                        <span className="ml-2 text-xs text-primary font-semibold uppercase">
                           (Du)
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       {participant.role === "host" ? "Host" : "Spieler"}
                     </span>
                   </div>
-                  <Badge variant={participant.role === "host" ? "default" : "outline"}>
+                  <Badge
+                    variant={participant.role === "host" ? "default" : "outline"}
+                    className="text-sm"
+                  >
                     {participant.score} Punkte
                   </Badge>
                 </li>
@@ -65,7 +73,7 @@ export function ParticipantsPanel({
             })}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Noch keine Spielenden beigetreten.
           </p>
         )}
