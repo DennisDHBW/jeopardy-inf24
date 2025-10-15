@@ -16,6 +16,7 @@ const JoinRoundSchema = z.object({
 export type JoinRoundState = {
   ok: boolean;
   error: string;
+  roundId?: string;
   alreadyJoined?: boolean;
 };
 
@@ -63,7 +64,7 @@ export async function joinRoundAction(
     .limit(1);
 
   if (already.length > 0) {
-    return { ok: true, error: "", alreadyJoined: true };
+    return { ok: true, error: "", alreadyJoined: true, roundId };
   }
 
   try {
@@ -76,7 +77,7 @@ export async function joinRoundAction(
     revalidatePath("/", "layout");
     revalidatePath(`/rounds/${roundId}`);
 
-    return { ok: true, error: "" };
+    return { ok: true, error: "", roundId };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Beitritt fehlgeschlagen.";
