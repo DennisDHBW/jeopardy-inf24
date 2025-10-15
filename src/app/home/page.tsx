@@ -1,7 +1,7 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field";
+import { FieldGroup, FieldDescription } from "@/components/ui/field";
 import { useActionState, useEffect, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
@@ -36,14 +36,15 @@ export default function HomePage() {
   const [activeIntent, setActiveIntent] = useState<string | null>(null);
 
   useEffect(() => {
-      if (state?.ok && typeof state.roundId === "string") {
-        const href = `/rounds/${state.roundId}` as Route;
-        router.push(href);
-      }
-      if(!pending) {
-        setActiveIntent(null);
-      }
-    }, [state?.ok, state?.roundId, router]);
+    if (state?.ok && typeof state.roundId === "string") {
+      const href = `/rounds/${state.roundId}` as Route;
+      router.push(href);
+    }
+
+    if (!pending) {
+      setActiveIntent(null);
+    }
+  }, [pending, router, state]);
 
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
