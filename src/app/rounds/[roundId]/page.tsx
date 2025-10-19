@@ -140,26 +140,28 @@ export default async function RoundPage({ params }: PageProps) {
   };
 
   return (
-    <div className="bg-muted">
-      <div className="relative flex min-h-svh flex-col gap-6 bg-muted/20 p-6">
-        <RoundHeader status={data.status} roundId={roundId} />
+    <div className="w-full overflow-x-auto">
+      <div className="min-w-[1024px] mx-auto">
+        <div className="relative flex min-h-svh flex-col gap-2 bg-muted p-6">
+          <RoundHeader status={data.status} roundId={roundId} />
 
-        <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-          <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80 lg:h-full">
-            <ParticipantsPanel
-              participants={participants}
-              currentUserId={currentUserId}
-              className="h-full"
-            />
-          </aside>
+          <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
+            <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80 lg:h-full">
+              <ParticipantsPanel
+                participants={participants}
+                currentUserId={currentUserId}
+                className="h-full"
+              />
+            </aside>
 
-          <main className="flex-1 lg:flex lg:flex-col lg:justify-center">
-            <JeopardyBoard data={data} />
-          </main>
-        </div>
+            <main className="flex-1 lg:flex lg:flex-col lg:justify-start">
+              <JeopardyBoard data={data} />
+            </main>
 
-        <div className="relative flex justify-start">
-          <UserProfile user={userProfileData} />
+            <div className="fixed bottom-6 left-6 z-50">
+              <UserProfile user={userProfileData} />
+            </div>
+          </div>       
         </div>
       </div>
     </div>

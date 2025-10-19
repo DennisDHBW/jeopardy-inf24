@@ -28,7 +28,7 @@ export function ParticipantsPanel({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Users className="size-4" />
-          Spielende
+          Spieler
         </CardTitle>
         <Badge variant="secondary" className="text-sm">
           {participants.length}

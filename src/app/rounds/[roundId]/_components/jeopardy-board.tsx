@@ -68,7 +68,7 @@ function ValueTile({
     <Dialog>
       <DialogTrigger asChild>
         <Card className={TILE_CARD_CLS}>
-          <CardContent className="h-20 grid place-items-center">
+          <CardContent className="h-17 grid place-items-center">
             <span className={TILE_VALUE_CLS}>${value}</span>
           </CardContent>
         </Card>
@@ -99,7 +99,7 @@ export default function JeopardyBoard({ data }: { data: RoundBoardData }) {
     clues.find((c) => c.categoryId === categoryId && c.value === value);
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 sm:p-6">
+    <div className="w-full max-w-6xl mx-auto p-4 sm:p-0">
       <div className={BOARD_CLS}>
         {/* Kategorien-Header */}
         <div className={GRID_CLS}>
