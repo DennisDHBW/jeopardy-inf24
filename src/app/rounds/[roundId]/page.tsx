@@ -12,10 +12,9 @@ import { eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
 import JeopardyBoard from "./_components/jeopardy-board";
 import { JoinRoundForm } from "./_components/join-round-form";
-import {
-  ParticipantsPanel,
-  type RoundParticipantView,
-} from "./_components/participants-panel";
+import { ParticipantsPanel } from "./_components/participants-panel";
+import { getRoundParticipants, type RoundParticipantView } from "@/lib/rounds";
+
 
 type BoardCategory = {
   columnIndex: number;
@@ -90,24 +89,6 @@ async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
     categories: cats,
     clues,
   };
-}
-
-async function getRoundParticipants(
-  roundId: string,
-): Promise<RoundParticipantView[]> {
-  const participants = await db
-    .select({
-      userId: roundPlayers.userId,
-      role: roundPlayers.role,
-      score: roundPlayers.score,
-      name: users.name,
-    })
-    .from(roundPlayers)
-    .leftJoin(users, eq(users.id, roundPlayers.userId))
-    .where(eq(roundPlayers.roundId, roundId))
-    .orderBy(roundPlayers.joinedAt);
-
-  return participants;
 }
 
 // ⬇️ params ist ein Promise in Next 15

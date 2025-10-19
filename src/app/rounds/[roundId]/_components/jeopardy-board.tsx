@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import type { RoundBoardData } from "../page";
+import { useEffect } from "react";
+import { io, Socket } from "socket.io-client";
 
 // 🎨 Styles (wie bei dir)
 const BOARD_CLS =
@@ -104,7 +106,37 @@ function ValueTile({
 }
 
 export default function JeopardyBoard({ data, role}: { data: RoundBoardData; role: "host" | "player" | "spectator"}) {
-  const { categories, clues } = data;
+  const { categories, clues, roundId } = data;
+
+  // 🧠 Socket-Setup
+  useEffect(() => {
+    // 1️⃣ Socket.IO Verbindung herstellen
+    const socket: Socket = io({
+      path: "/api/socket",
+    });
+
+    // 2️⃣ Runde beitreten
+    socket.emit("joinRound", roundId);
+    console.log("📡 Tritt Runde bei:", roundId);
+
+    // 3️⃣ Event: Host öffnet Frage
+    socket.on("showQuestionDialog", ({ questionId }) => {
+      console.log("❓ Frage anzeigen:", questionId);
+      // ⬇️ Hier kannst du z.B. ein Modal öffnen:
+      // setActiveQuestion(questionId);
+    });
+
+    // 4️⃣ Event: Teilnehmerliste aktualisiert
+    socket.on("participantsUpdated", (participants) => {
+      console.log("👥 Neue Teilnehmerliste:", participants);
+    });
+
+    // 5️⃣ Cleanup bei Komponenten-Unmount
+    return () => {
+      console.log("🔌 Trenne Socket-Verbindung");
+      socket.disconnect();
+    };
+  }, [roundId]);
 
   // Hilfszugriff: Frage anhand (categoryId, value) finden
   const getClue = (categoryId: number, value: number) =>
