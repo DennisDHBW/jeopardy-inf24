@@ -45,7 +45,11 @@ export type RoundBoardData = {
 };
 
 async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
-  const rArr = await db.select().from(rounds).where(eq(rounds.id, roundId)).limit(1);
+  const rArr = await db
+    .select()
+    .from(rounds)
+    .where(eq(rounds.id, roundId))
+    .limit(1);
   if (rArr.length === 0) return null;
   const r = rArr[0];
   if (!r) return null;
@@ -118,11 +122,12 @@ async function getRoundParticipants(
 type PageProps = { params: Promise<{ roundId: string }> };
 
 export default async function RoundPage({ params }: PageProps) {
-  const { roundId } = await params;   // ⬅️ erst awaiten
-  const [session, data, participants] = await Promise.all([
+  const { roundId } = await params; // ⬅️ erst awaiten
+  const participantsPromise = getRoundParticipants(roundId);
+
+  const [session, data] = await Promise.all([
     getServerSession(),
     getBoardData(roundId),
-    getRoundParticipants(roundId),
   ]);
 
   if (!data) {
@@ -148,8 +153,9 @@ export default async function RoundPage({ params }: PageProps) {
           <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
             <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-80 lg:h-full">
               <ParticipantsPanel
-                participants={participants}
+                participantsPromise={participantsPromise}
                 currentUserId={currentUserId}
+                roundId={roundId}
                 className="h-full"
               />
             </aside>
@@ -161,7 +167,7 @@ export default async function RoundPage({ params }: PageProps) {
             <div className="fixed bottom-6 left-6 z-50">
               <UserProfile user={userProfileData} />
             </div>
-          </div>       
+          </div>
         </div>
       </div>
     </div>

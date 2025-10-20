@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { rounds, roundPlayers } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
+import { emitRoundParticipantsUpdate } from "@/lib/round_events";
 
 const JoinRoundSchema = z.object({
   roundId: z.string().uuid("Ungültige Runde."),
@@ -76,6 +77,7 @@ export async function joinRoundAction(
 
     revalidatePath("/", "layout");
     revalidatePath(`/rounds/${roundId}`);
+    emitRoundParticipantsUpdate(roundId);
 
     return { ok: true, error: "", roundId };
   } catch (error) {
