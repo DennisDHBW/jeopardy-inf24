@@ -42,6 +42,7 @@ export type RoundBoardData = {
   status: string;
   categories: BoardCategory[];
   clues: BoardClue[];
+  currentPlayerId: string | null;
 };
 
 async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
@@ -94,28 +95,40 @@ async function getBoardData(roundId: string): Promise<RoundBoardData | null> {
     status: r.status,
     categories: cats,
     clues,
+    currentPlayerId: r.currentPlayerId ?? null,
   };
 }
 
-async function getRoundParticipants(
-  roundId: string,
-): Promise<RoundParticipantView[]> {
-  const participants = await db
-    .select({
-      userId: roundPlayers.userId,
-      role: roundPlayers.role,
-      score: roundPlayers.score,
-      name: users.name,
-    })
-    .from(roundPlayers)
-    .leftJoin(users, eq(users.id, roundPlayers.userId))
-    .where(eq(roundPlayers.roundId, roundId))
-    .orderBy(roundPlayers.joinedAt);
+async function getRoundParticipants(roundId: string): Promise<{
+  participants: RoundParticipantView[];
+  activePlayerId: string | null;
+}> {
+  const [participants, roundState] = await Promise.all([
+    db
+      .select({
+        userId: roundPlayers.userId,
+        role: roundPlayers.role,
+        score: roundPlayers.score,
+        name: users.name,
+      })
+      .from(roundPlayers)
+      .leftJoin(users, eq(users.id, roundPlayers.userId))
+      .where(eq(roundPlayers.roundId, roundId))
+      .orderBy(roundPlayers.joinedAt),
+    db
+      .select({ currentPlayerId: rounds.currentPlayerId })
+      .from(rounds)
+      .where(eq(rounds.id, roundId))
+      .limit(1),
+  ]);
 
-  return participants.map((p) => ({
-    ...p,
-    role: p.role === "host" ? "host" : "player",
-  }));
+  return {
+    participants: participants.map((p) => ({
+      ...p,
+      role: p.role === "host" ? "host" : "player",
+    })),
+    activePlayerId: roundState[0]?.currentPlayerId ?? null,
+  };
 }
 
 // ⬇️ params ist ein Promise in Next 15
@@ -125,8 +138,9 @@ export default async function RoundPage({ params }: PageProps) {
   const { roundId } = await params; // ⬅️ erst awaiten
   const participantsPromise = getRoundParticipants(roundId);
   const hostIdPromise = participantsPromise.then(
-    (items) =>
-      items.find((participant) => participant.role === "host")?.userId ?? null,
+    ({ participants }) =>
+      participants.find((participant) => participant.role === "host")?.userId ??
+      null,
   );
 
   const [session, data, hostId] = await Promise.all([

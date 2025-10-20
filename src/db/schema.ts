@@ -1,5 +1,10 @@
 import { relations, sql } from "drizzle-orm";
-import { sqliteTable, text, uniqueIndex, integer } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  uniqueIndex,
+  integer,
+} from "drizzle-orm/sqlite-core";
 
 /**
  * Authentication schema.
@@ -117,9 +122,11 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
 // --------------------
 export const questions = sqliteTable("questions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  categoryId: integer("category_id").notNull().references(() => categories.id, {
-    onDelete: "cascade",
-  }),
+  categoryId: integer("category_id")
+    .notNull()
+    .references(() => categories.id, {
+      onDelete: "cascade",
+    }),
   prompt: text("prompt").notNull(),
   answer: text("answer").notNull(),
   value: integer("value").notNull(),
@@ -155,6 +162,9 @@ export const rounds = sqliteTable("rounds", {
   gameId: text("game_id").notNull().default("default"),
   roundNumber: integer("round_number").notNull().default(1),
   status: text("status").notNull().default("open"),
+  currentPlayerId: text("current_player_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
   seed: text("seed"),
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP)`),
 });

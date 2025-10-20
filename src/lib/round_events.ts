@@ -25,7 +25,22 @@ export type RoundClueRevealedEvent = {
   clue: RoundEventCluePayload;
 };
 
-export type RoundEvent = RoundParticipantsEvent | RoundClueRevealedEvent;
+export type RoundStatePayload = {
+  roundId: string;
+  activePlayerId: string | null;
+  questionId?: number;
+  result?: "correct" | "incorrect";
+};
+
+export type RoundStateEvent = {
+  type: "round-state";
+  state: RoundStatePayload;
+};
+
+export type RoundEvent =
+  | RoundParticipantsEvent
+  | RoundClueRevealedEvent
+  | RoundStateEvent;
 
 type RoundEventName = RoundEvent["type"];
 
@@ -52,11 +67,22 @@ export function emitRoundClueReveal(
   emitRoundEvent(roundId, { type: "clue-revealed", clue });
 }
 
+export function emitRoundStateChange(
+  roundId: string,
+  state: RoundStatePayload,
+): void {
+  emitRoundEvent(roundId, { type: "round-state", state });
+}
+
 export function subscribeToRoundEvents(
   roundId: string,
   listener: (event: RoundEvent) => void,
 ): () => void {
-  const keys: RoundEventName[] = ["participants-update", "clue-revealed"];
+  const keys: RoundEventName[] = [
+    "participants-update",
+    "clue-revealed",
+    "round-state",
+  ];
   for (const key of keys) {
     emitter.on(getEventKey(roundId, key), listener);
   }

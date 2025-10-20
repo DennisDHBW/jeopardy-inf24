@@ -8,7 +8,10 @@ import { db } from "@/db";
 import { rounds, roundPlayers } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
-import { emitRoundParticipantsUpdate } from "@/lib/round_events";
+import {
+  emitRoundParticipantsUpdate,
+  emitRoundStateChange,
+} from "@/lib/round_events";
 
 const JoinRoundSchema = z.object({
   roundId: z.string().uuid("Ungültige Runde."),
@@ -45,23 +48,23 @@ export async function joinRoundAction(
 
   const { roundId } = parsed.data;
 
-  const roundExists = await db
-    .select({ id: rounds.id })
+  const roundRows = await db
+    .select({ id: rounds.id, currentPlayerId: rounds.currentPlayerId })
     .from(rounds)
-    .where(and(
-      eq(rounds.id, roundId),
-      eq(rounds.status, "open")
-    ))
+    .where(and(eq(rounds.id, roundId), eq(rounds.status, "open")))
     .limit(1);
 
-  if (roundExists.length === 0) {
+  if (roundRows.length === 0) {
     return { ok: false, error: "Diese Runde existiert nicht." };
   }
+  const roundRow = roundRows[0];
 
   const already = await db
     .select({ id: roundPlayers.id })
     .from(roundPlayers)
-    .where(and(eq(roundPlayers.roundId, roundId), eq(roundPlayers.userId, userId)))
+    .where(
+      and(eq(roundPlayers.roundId, roundId), eq(roundPlayers.userId, userId)),
+    )
     .limit(1);
 
   if (already.length > 0) {
@@ -69,15 +72,32 @@ export async function joinRoundAction(
   }
 
   try {
-    await db.insert(roundPlayers).values({
-      roundId,
-      userId,
-      role: "player",
+    let activePlayerChanged = false;
+    await db.transaction(async (tx) => {
+      await tx.insert(roundPlayers).values({
+        roundId,
+        userId,
+        role: "player",
+      });
+
+      if (!roundRow?.currentPlayerId) {
+        await tx
+          .update(rounds)
+          .set({ currentPlayerId: userId })
+          .where(eq(rounds.id, roundId));
+        activePlayerChanged = true;
+      }
     });
 
     revalidatePath("/", "layout");
     revalidatePath(`/rounds/${roundId}`);
     emitRoundParticipantsUpdate(roundId);
+    if (activePlayerChanged) {
+      emitRoundStateChange(roundId, {
+        roundId,
+        activePlayerId: userId,
+      });
+    }
 
     return { ok: true, error: "", roundId };
   } catch (error) {

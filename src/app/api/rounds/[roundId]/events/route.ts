@@ -67,6 +67,11 @@ export function GET(_request: NextRequest, context: RouteContext): Response {
 
         if (event.type === "clue-revealed") {
           safeEnqueue(encodeEvent("clue-revealed", JSON.stringify(event.clue)));
+          return;
+        }
+
+        if (event.type === "round-state") {
+          safeEnqueue(encodeEvent("round-state", JSON.stringify(event.state)));
         }
       });
 

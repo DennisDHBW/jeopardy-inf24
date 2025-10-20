@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,14 @@ import {
   revealClueAction,
   type RevealClueState,
 } from "@/actions/rounds/reveal-clue";
-import type { RoundEventCluePayload } from "@/lib/round_events";
+import {
+  evaluateClueAction,
+  type EvaluateClueState,
+} from "@/actions/rounds/evaluate-clue";
+import type {
+  RoundEventCluePayload,
+  RoundStatePayload,
+} from "@/lib/round_events";
 
 const BOARD_CLS =
   "rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 dark:from-slate-900 dark:to-slate-950 p-3 sm:p-4 shadow-xl border";
@@ -135,37 +143,73 @@ export default function JeopardyBoard({
     null,
   );
   const pendingQuestionRef = useRef<number | null>(null);
+  const activeClueRef = useRef<RoundEventCluePayload | null>(null);
 
-  const { state, formAction, pending } = useFormAction<RevealClueState>(
-    revealClueAction,
-    { ok: false, error: null },
-  );
+  const {
+    state: revealState,
+    formAction: revealAction,
+    pending: revealPending,
+  } = useFormAction<RevealClueState>(revealClueAction, {
+    ok: false,
+    error: null,
+  });
+
+  const {
+    state: evaluateState,
+    formAction: evaluateAction,
+    pending: evaluatePending,
+  } = useFormAction<EvaluateClueState>(evaluateClueAction, {
+    ok: false,
+    error: null,
+  });
+
+  const [currentActivePlayerId, setCurrentActivePlayerId] = useState<
+    string | null
+  >(data.currentPlayerId ?? null);
+
+  useEffect(() => {
+    setCurrentActivePlayerId(data.currentPlayerId ?? null);
+  }, [data.currentPlayerId]);
 
   useEffect(() => {
     setRevealedIds(new Set(initialRevealedIds));
   }, [initialRevealedIds]);
 
   useEffect(() => {
-    if (state?.ok && state.clue) {
-      setActiveClue(state.clue);
+    activeClueRef.current = activeClue;
+  }, [activeClue]);
+
+  useEffect(() => {
+    if (revealState?.ok && revealState.clue) {
+      setActiveClue(revealState.clue);
       setDialogOpen(true);
       setErrorMessage(null);
       setRevealedIds((prev) => {
-        if (prev.has(state.clue!.questionId)) {
+        if (prev.has(revealState.clue!.questionId)) {
           return prev;
         }
         const next = new Set(prev);
-        next.add(state.clue.questionId);
+        next.add(revealState.clue.questionId);
         return next;
       });
-    } else if (state?.error) {
-      setErrorMessage(state.error);
+    } else if (revealState?.error) {
+      setErrorMessage(revealState.error);
     }
 
-    if (!pending) {
+    if (!revealPending) {
       pendingQuestionRef.current = null;
     }
-  }, [state, pending]);
+  }, [revealState, revealPending]);
+
+  useEffect(() => {
+    if (evaluateState?.ok) {
+      setDialogOpen(false);
+      setActiveClue(null);
+      setErrorMessage(null);
+    } else if (evaluateState?.error) {
+      setErrorMessage(evaluateState.error);
+    }
+  }, [evaluateState]);
 
   useEffect(() => {
     let disposed = false;
@@ -174,13 +218,6 @@ export default function JeopardyBoard({
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
-      }
-    };
-
-    const closeEventSource = () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
       }
     };
 
@@ -205,6 +242,39 @@ export default function JeopardyBoard({
       }
     };
 
+    const handleRoundState = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as RoundStatePayload;
+        if (typeof payload?.activePlayerId !== "undefined") {
+          setCurrentActivePlayerId(payload.activePlayerId ?? null);
+        }
+        const current = activeClueRef.current;
+        if (payload?.questionId && current?.questionId === payload.questionId) {
+          setDialogOpen(false);
+          setActiveClue(null);
+          setErrorMessage(null);
+        }
+      } catch {
+        // ignore malformed payloads
+      }
+    };
+
+    const closeEventSource = () => {
+      const source = eventSourceRef.current;
+      if (source) {
+        source.removeEventListener(
+          "clue-revealed",
+          handleClueRevealed as EventListener,
+        );
+        source.removeEventListener(
+          "round-state",
+          handleRoundState as EventListener,
+        );
+        source.close();
+        eventSourceRef.current = null;
+      }
+    };
+
     const connect = () => {
       closeEventSource();
       if (disposed) return;
@@ -216,12 +286,17 @@ export default function JeopardyBoard({
         "clue-revealed",
         handleClueRevealed as EventListener,
       );
+      source.addEventListener("round-state", handleRoundState as EventListener);
 
       source.onerror = () => {
         if (disposed) return;
         source.removeEventListener(
           "clue-revealed",
           handleClueRevealed as EventListener,
+        );
+        source.removeEventListener(
+          "round-state",
+          handleRoundState as EventListener,
         );
         closeEventSource();
         clearReconnectTimeout();
@@ -233,13 +308,6 @@ export default function JeopardyBoard({
 
     return () => {
       disposed = true;
-      const source = eventSourceRef.current;
-      if (source) {
-        source.removeEventListener(
-          "clue-revealed",
-          handleClueRevealed as EventListener,
-        );
-      }
       closeEventSource();
       clearReconnectTimeout();
     };
@@ -252,7 +320,10 @@ export default function JeopardyBoard({
 
   return (
     <>
-      <form action={formAction} className="w-full max-w-6xl mx-auto p-4 sm:p-0">
+      <form
+        action={revealAction}
+        className="w-full max-w-6xl mx-auto p-4 sm:p-0"
+      >
         <input type="hidden" name="roundId" value={roundId} />
         <div className={BOARD_CLS}>
           <div className={GRID_CLS}>
@@ -283,7 +354,7 @@ export default function JeopardyBoard({
                         canSelect &&
                         !revealed &&
                         pendingQuestionRef.current !== questionId &&
-                        !pending
+                        !revealPending
                       }
                       onSelect={() => {
                         if (!questionId) return;
@@ -324,6 +395,48 @@ export default function JeopardyBoard({
               </>
             ) : null}
           </div>
+          {canSelect && activeClue ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Der aktive Spieler ist in der Spielerliste hervorgehoben.
+              </p>
+              {!currentActivePlayerId && (
+                <p className="text-sm text-destructive">
+                  Es ist derzeit kein aktiver Spieler verfügbar.
+                </p>
+              )}
+              <form action={evaluateAction} className="flex flex-col gap-2">
+                <input type="hidden" name="roundId" value={roundId} />
+                <input
+                  type="hidden"
+                  name="questionId"
+                  value={String(activeClue.questionId)}
+                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                  <Button
+                    type="submit"
+                    name="result"
+                    value="correct"
+                    variant="default"
+                    disabled={evaluatePending || !currentActivePlayerId}
+                    onClick={() => setErrorMessage(null)}
+                  >
+                    Richtig (+${activeClue.value})
+                  </Button>
+                  <Button
+                    type="submit"
+                    name="result"
+                    value="incorrect"
+                    variant="destructive"
+                    disabled={evaluatePending || !currentActivePlayerId}
+                    onClick={() => setErrorMessage(null)}
+                  >
+                    Falsch (-${activeClue.value})
+                  </Button>
+                </div>
+              </form>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

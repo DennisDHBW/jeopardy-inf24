@@ -14,8 +14,13 @@ export type RoundParticipantView = {
   score: number;
 };
 
+type RoundParticipantsData = {
+  participants: RoundParticipantView[];
+  activePlayerId: string | null;
+};
+
 type ParticipantsPanelProps = {
-  participantsPromise: Promise<RoundParticipantView[]>;
+  participantsPromise: Promise<RoundParticipantsData>;
   currentUserId?: string | null;
   roundId: string;
   className?: string;
@@ -27,7 +32,7 @@ export function ParticipantsPanel({
   roundId,
   className,
 }: ParticipantsPanelProps) {
-  const participants = use(participantsPromise);
+  const { participants, activePlayerId } = use(participantsPromise);
   const hasParticipants = participants.length > 0;
 
   const router = useRouter();
@@ -76,6 +81,7 @@ export function ParticipantsPanel({
       const existing = eventSourceRef.current;
       if (existing) {
         existing.removeEventListener("participants-update", handleUpdate);
+        existing.removeEventListener("round-state", handleUpdate);
         existing.close();
         eventSourceRef.current = null;
       }
@@ -89,6 +95,7 @@ export function ParticipantsPanel({
       eventSourceRef.current = source;
 
       source.addEventListener("participants-update", handleUpdate);
+      source.addEventListener("round-state", handleUpdate);
 
       source.onerror = () => {
         if (disposed) {
@@ -125,6 +132,9 @@ export function ParticipantsPanel({
           <ul className="space-y-2">
             {participants.map((participant) => {
               const isCurrent = participant.userId === currentUserId;
+              const isActive =
+                participant.role === "player" &&
+                participant.userId === activePlayerId;
               const label =
                 typeof participant.name === "string" &&
                 participant.name.length > 0
@@ -134,7 +144,12 @@ export function ParticipantsPanel({
               return (
                 <li
                   key={participant.userId}
-                  className="flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3"
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border bg-muted/40 px-4 py-3 transition-colors",
+                    isActive
+                      ? "border-primary/60 bg-primary/10 shadow-sm"
+                      : "border-muted",
+                  )}
                 >
                   <div className="flex flex-col">
                     <span className="text-base font-semibold text-foreground">
@@ -142,6 +157,11 @@ export function ParticipantsPanel({
                       {isCurrent && (
                         <span className="ml-2 text-xs text-primary font-semibold uppercase">
                           (Du)
+                        </span>
+                      )}
+                      {isActive && (
+                        <span className="ml-2 text-xs text-primary font-semibold uppercase">
+                          Am Zug
                         </span>
                       )}
                     </span>
