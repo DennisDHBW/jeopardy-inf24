@@ -124,10 +124,15 @@ type PageProps = { params: Promise<{ roundId: string }> };
 export default async function RoundPage({ params }: PageProps) {
   const { roundId } = await params; // ⬅️ erst awaiten
   const participantsPromise = getRoundParticipants(roundId);
+  const hostIdPromise = participantsPromise.then(
+    (items) =>
+      items.find((participant) => participant.role === "host")?.userId ?? null,
+  );
 
-  const [session, data] = await Promise.all([
+  const [session, data, hostId] = await Promise.all([
     getServerSession(),
     getBoardData(roundId),
+    hostIdPromise,
   ]);
 
   if (!data) {
@@ -161,7 +166,11 @@ export default async function RoundPage({ params }: PageProps) {
             </aside>
 
             <main className="flex-1 lg:flex lg:flex-col lg:justify-start">
-              <JeopardyBoard data={data} />
+              <JeopardyBoard
+                data={data}
+                roundId={roundId}
+                canSelect={Boolean(currentUserId) && currentUserId === hostId}
+              />
             </main>
 
             <div className="fixed bottom-6 left-6 z-50">

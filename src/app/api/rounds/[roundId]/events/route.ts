@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { NextRequest } from "next/server";
-import { subscribeToRoundParticipants } from "@/lib/round_events";
+import { subscribeToRoundEvents } from "@/lib/round_events";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,27 +27,58 @@ export function GET(_request: NextRequest, context: RouteContext): Response {
     return new Response("roundId is required", { status: 400 });
   }
 
+  let cleanup: (() => void) | null = null;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      controller.enqueue(encodeEvent("connected"));
+      let closed = false;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+      let unsubscribe = () => {};
 
-      const unsubscribe = subscribeToRoundParticipants(roundId, () => {
-        controller.enqueue(encodeEvent("participants-update"));
+      const doCleanup = () => {
+        if (closed) return;
+        closed = true;
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = null;
+        }
+        unsubscribe();
+        cleanup = null;
+      };
+
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (closed) {
+          return;
+        }
+        try {
+          controller.enqueue(chunk);
+        } catch {
+          doCleanup();
+        }
+      };
+
+      safeEnqueue(encodeEvent("connected"));
+
+      unsubscribe = subscribeToRoundEvents(roundId, (event) => {
+        if (event.type === "participants-update") {
+          safeEnqueue(encodeEvent("participants-update"));
+          return;
+        }
+
+        if (event.type === "clue-revealed") {
+          safeEnqueue(encodeEvent("clue-revealed", JSON.stringify(event.clue)));
+        }
       });
 
-      const heartbeat = setInterval(() => {
-        controller.enqueue(encodeEvent("heartbeat", "keep-alive"));
+      heartbeat = setInterval(() => {
+        safeEnqueue(encodeEvent("heartbeat", "keep-alive"));
       }, 25_000);
 
-      controller.enqueue(encodeEvent("ready"));
-
-      return () => {
-        clearInterval(heartbeat);
-        unsubscribe();
-      };
+      safeEnqueue(encodeEvent("ready"));
+      cleanup = doCleanup;
     },
     cancel() {
-      // NO-OP: start cleanup handles this.
+      cleanup?.();
     },
   });
 
