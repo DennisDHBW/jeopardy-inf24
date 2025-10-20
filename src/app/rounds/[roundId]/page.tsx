@@ -5,16 +5,12 @@ import {
   roundClues,
   categories,
   questions,
-  roundPlayers,
-  user as users,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
-import JeopardyBoard from "./_components/jeopardy-board";
 import { JoinRoundForm } from "./_components/join-round-form";
-import { ParticipantsPanel } from "./_components/participants-panel";
+import RoundClient from "./_components/round-client";
 import { getRoundParticipants, type RoundParticipantView } from "@/lib/rounds";
-
 
 type BoardCategory = {
   columnIndex: number;
@@ -137,12 +133,12 @@ export default async function RoundPage({ params }: PageProps) {
         />
       </div>
 
-      <ParticipantsPanel
-        participants={participants}
+      <RoundClient
+        initialBoard={data}
+        initialParticipants={participants}
         currentUserId={currentUserId}
+        role={currentRole as "host" | "player" | "spectator"}
       />
-
-      <JeopardyBoard data={data} role={currentRole}/>
     </div>
   );
 }

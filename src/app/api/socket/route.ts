@@ -1,3 +1,4 @@
+import "server-only";
 import { NextRequest } from "next/server";
 import { Server as SocketIOServer } from "socket.io";
 import { Server as HTTPServer } from "http";
@@ -17,6 +18,8 @@ import { getRoundParticipants, RoundParticipantView } from "@/lib/rounds";
 // Optional: Wenn du Better Auth Sessions prüfen willst
 import { auth } from "@/lib/auth";
 import { string } from "zod";
+
+export const runtime = "nodejs";
 
 declare module "http" {
   interface Server {

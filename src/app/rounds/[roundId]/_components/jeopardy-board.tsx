@@ -14,8 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import type { RoundBoardData } from "../page";
-import { useEffect } from "react";
-import { io, Socket } from "socket.io-client";
+import { useState } from "react";
 
 // 🎨 Styles (wie bei dir)
 const BOARD_CLS =
@@ -49,6 +48,8 @@ function ValueTile({
   answer,
   disabled,
   role,
+  questionId,
+  onOpen,
 }: {
   value: number;
   categoryName: string;
@@ -56,6 +57,8 @@ function ValueTile({
   answer?: string;
   disabled?: boolean;
   role?: "host" | "player" | "spectator";
+  questionId?: number;
+  onOpen?: (questionId: number) => void;
 }) {
   // Wenn mal eine Stufe fehlt, zeigen wir eine deaktivierte Kachel
   if (disabled) {
@@ -81,7 +84,12 @@ function ValueTile({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Card className={TILE_CARD_CLS}>
+        <Card
+          className={TILE_CARD_CLS}
+          onClick={() => {
+            if (questionId && onOpen) onOpen(questionId);
+          }}
+        >
           <CardContent className="h-20 grid place-items-center">
             <span className={TILE_VALUE_CLS}>${value}</span>
           </CardContent>
@@ -105,38 +113,16 @@ function ValueTile({
   );
 }
 
-export default function JeopardyBoard({ data, role}: { data: RoundBoardData; role: "host" | "player" | "spectator"}) {
+export default function JeopardyBoard({
+  data,
+  role,
+  onOpenQuestion,
+}: {
+  data: RoundBoardData;
+  role: "host" | "player" | "spectator";
+  onOpenQuestion?: (questionId: number) => void;
+}) {
   const { categories, clues, roundId } = data;
-
-  // 🧠 Socket-Setup
-  useEffect(() => {
-    // 1️⃣ Socket.IO Verbindung herstellen
-    const socket: Socket = io({
-      path: "/api/socket",
-    });
-
-    // 2️⃣ Runde beitreten
-    socket.emit("joinRound", roundId);
-    console.log("📡 Tritt Runde bei:", roundId);
-
-    // 3️⃣ Event: Host öffnet Frage
-    socket.on("showQuestionDialog", ({ questionId }) => {
-      console.log("❓ Frage anzeigen:", questionId);
-      // ⬇️ Hier kannst du z.B. ein Modal öffnen:
-      // setActiveQuestion(questionId);
-    });
-
-    // 4️⃣ Event: Teilnehmerliste aktualisiert
-    socket.on("participantsUpdated", (participants) => {
-      console.log("👥 Neue Teilnehmerliste:", participants);
-    });
-
-    // 5️⃣ Cleanup bei Komponenten-Unmount
-    return () => {
-      console.log("🔌 Trenne Socket-Verbindung");
-      socket.disconnect();
-    };
-  }, [roundId]);
 
   // Hilfszugriff: Frage anhand (categoryId, value) finden
   const getClue = (categoryId: number, value: number) =>
@@ -169,6 +155,8 @@ export default function JeopardyBoard({ data, role}: { data: RoundBoardData; rol
                     answer={q?.answer}
                     disabled={!q} // falls eine Stufe in einer Kategorie fehlt
                     role={role}
+                    questionId={q?.questionId}
+                    onOpen={onOpenQuestion}
                   />
                 );
               })}

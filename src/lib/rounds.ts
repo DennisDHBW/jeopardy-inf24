@@ -24,5 +24,11 @@ export async function getRoundParticipants(roundId: string): Promise<RoundPartic
     .where(eq(roundPlayers.roundId, roundId))
     .orderBy(roundPlayers.joinedAt);
 
-  return participants;
+  // Normalize role string into the expected union type ("host" | "player")
+  return participants.map((p) => ({
+    userId: p.userId,
+    name: p.name,
+    role: p.role === "host" ? "host" : "player",
+    score: p.score,
+  }));
 }
