@@ -161,7 +161,7 @@ export const rounds = sqliteTable("rounds", {
   id: text("id").primaryKey(), // UUID als Text
   gameId: text("game_id").notNull().default("default"),
   roundNumber: integer("round_number").notNull().default(1),
-  status: text("status").notNull().default("open"),
+  status: text("status").notNull().default("idle"),
   currentPlayerId: text("current_player_id").references(() => user.id, {
     onDelete: "set null",
   }),

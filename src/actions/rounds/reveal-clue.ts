@@ -5,7 +5,13 @@ import "server-only";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { roundClues, roundPlayers, questions, categories } from "@/db/schema";
+import {
+  roundClues,
+  roundPlayers,
+  questions,
+  categories,
+  rounds,
+} from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getServerSession } from "@/lib/auth-server";
 import {
@@ -64,6 +70,23 @@ export async function revealClueAction(
     return {
       ok: false,
       error: "Nur der Host kann Fragen aufdecken.",
+    };
+  }
+
+  const [roundRow] = await db
+    .select({ status: rounds.status })
+    .from(rounds)
+    .where(eq(rounds.id, roundId))
+    .limit(1);
+
+  if (!roundRow) {
+    return { ok: false, error: "Diese Runde existiert nicht." };
+  }
+
+  if (roundRow.status !== "active") {
+    return {
+      ok: false,
+      error: "Die Runde wurde noch nicht gestartet.",
     };
   }
 

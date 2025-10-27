@@ -1,6 +1,7 @@
 import "server-only";
 
 import { EventEmitter } from "node:events";
+import type { RoundWinner } from "./round-status";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -30,6 +31,8 @@ export type RoundStatePayload = {
   activePlayerId: string | null;
   questionId?: number;
   result?: "correct" | "incorrect";
+  status?: "idle" | "active" | "closed";
+  winner?: RoundWinner | null;
 };
 
 export type RoundStateEvent = {

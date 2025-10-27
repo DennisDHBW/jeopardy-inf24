@@ -4,7 +4,6 @@ import "server-only";
 
 import { db } from "@/db";
 import { sql, eq, and } from "drizzle-orm"; // and ergänzt
-import { z } from "zod";
 import {
   rounds,
   roundCategories,
@@ -20,7 +19,7 @@ import { getServerSession } from "@/lib/auth-server";
   name: z.string().trim().min(1, "Bitte einen Namen angeben.").max(100),
 });*/
 
-type ActionState = {
+export type CreateRoundState = {
   ok: boolean;
   error: string;
   name?: string;
@@ -28,9 +27,9 @@ type ActionState = {
 };
 
 export async function createRoundAction(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+  _prev: CreateRoundState,
+  _formData: FormData,
+): Promise<CreateRoundState> {
   const session = await getServerSession();
   const userId = session?.user?.id;
 
@@ -56,9 +55,14 @@ export async function createRoundAction(
   const roundId = crypto.randomUUID();
 
   // Mindestens 6 Kategorien?
-  const catCount = await db.select({ c: sql<number>`count(*)` }).from(categories);
+  const catCount = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(categories);
   if ((catCount[0]?.c ?? 0) < 6) {
-    return { ok: false, error: "Es sind mindestens 6 Kategorien erforderlich." };
+    return {
+      ok: false,
+      error: "Es sind mindestens 6 Kategorien erforderlich.",
+    };
   }
 
   // Wertstufen, die je Kategorie exakt einmal vorkommen müssen
@@ -67,8 +71,9 @@ export async function createRoundAction(
   try {
     await db.transaction(async (tx) => {
       // 1) Runde anlegen
-      await tx.insert(rounds).values({ 
+      await tx.insert(rounds).values({
         id: roundId,
+        status: "idle",
         //gameId: name,
       });
 
@@ -114,7 +119,9 @@ export async function createRoundAction(
           const q = await tx
             .select({ id: questions.id })
             .from(questions)
-            .where(and(eq(questions.categoryId, catId), eq(questions.value, value)))
+            .where(
+              and(eq(questions.categoryId, catId), eq(questions.value, value)),
+            )
             .orderBy(sql`random()`)
             .limit(1);
 
@@ -141,8 +148,8 @@ export async function createRoundAction(
           picked.map((p) => ({
             roundId,
             questionId: p.questionId,
-            columnIndex: col,      // Spalte = Kategorie
-            rowIndex: p.rowIndex,  // Zeile 0..4 = 100..500
+            columnIndex: col, // Spalte = Kategorie
+            rowIndex: p.rowIndex, // Zeile 0..4 = 100..500
             revealed: 0,
             answered: 0,
           })),
@@ -156,7 +163,10 @@ export async function createRoundAction(
     //return { ok: true, error: "", name, roundId };
     return { ok: true, error: "", roundId };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unbekannter Fehler beim Erstellen der Runde.";
+    const msg =
+      e instanceof Error
+        ? e.message
+        : "Unbekannter Fehler beim Erstellen der Runde.";
     return { ok: false, error: msg };
   }
 }

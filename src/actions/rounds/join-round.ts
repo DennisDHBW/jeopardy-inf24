@@ -49,15 +49,44 @@ export async function joinRoundAction(
   const { roundId } = parsed.data;
 
   const roundRows = await db
-    .select({ id: rounds.id, currentPlayerId: rounds.currentPlayerId })
+    .select({
+      id: rounds.id,
+      status: rounds.status,
+      currentPlayerId: rounds.currentPlayerId,
+    })
     .from(rounds)
-    .where(and(eq(rounds.id, roundId), eq(rounds.status, "open")))
+    .where(eq(rounds.id, roundId))
     .limit(1);
 
   if (roundRows.length === 0) {
     return { ok: false, error: "Diese Runde existiert nicht." };
   }
   const roundRow = roundRows[0];
+
+  if (!roundRow) {
+    return { ok: false, error: "Diese Runde existiert nicht." };
+  }
+
+  if (roundRow.status === "active") {
+    return {
+      ok: false,
+      error: "Diese Runde hat bereits begonnen.",
+    };
+  }
+
+  if (roundRow.status === "closed") {
+    return {
+      ok: false,
+      error: "Diese Runde ist bereits beendet.",
+    };
+  }
+
+  if (roundRow.status !== "idle") {
+    return {
+      ok: false,
+      error: "Der aktuelle Status erlaubt keinen Beitritt.",
+    };
+  }
 
   const already = await db
     .select({ id: roundPlayers.id })

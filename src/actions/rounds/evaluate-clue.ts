@@ -6,7 +6,13 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { sql, and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { roundClues, roundPlayers, rounds, questions } from "@/db/schema";
+import {
+  roundClues,
+  roundPlayers,
+  rounds,
+  questions,
+  user as users,
+} from "@/db/schema";
 import { getServerSession } from "@/lib/auth-server";
 import {
   emitRoundParticipantsUpdate,
@@ -56,6 +62,30 @@ export async function evaluateClueAction(
 
   const { roundId, questionId, result } = parsed.data;
 
+  const [roundStatusRow] = await db
+    .select({ status: rounds.status })
+    .from(rounds)
+    .where(eq(rounds.id, roundId))
+    .limit(1);
+
+  if (!roundStatusRow) {
+    return { ok: false, error: "Diese Runde existiert nicht." };
+  }
+
+  if (roundStatusRow.status === "idle") {
+    return {
+      ok: false,
+      error: "Die Runde wurde noch nicht gestartet.",
+    };
+  }
+
+  if (roundStatusRow.status === "closed") {
+    return {
+      ok: false,
+      error: "Diese Runde wurde bereits abgeschlossen.",
+    };
+  }
+
   const hostMembership = await db
     .select({ role: roundPlayers.role })
     .from(roundPlayers)
@@ -104,7 +134,9 @@ export async function evaluateClueAction(
         }
 
         const roundRow = await tx
-          .select({ currentPlayerId: rounds.currentPlayerId })
+          .select({
+            currentPlayerId: rounds.currentPlayerId,
+          })
           .from(rounds)
           .where(eq(rounds.id, roundId))
           .limit(1);
@@ -173,16 +205,78 @@ export async function evaluateClueAction(
             ? orderedIds[(currentIndex + 1) % orderedIds.length]
             : activePlayerId;
 
+        const [remainingClues] = await tx
+          .select({
+            count: sql<number>`count(*)`,
+          })
+          .from(roundClues)
+          .where(
+            and(eq(roundClues.roundId, roundId), eq(roundClues.answered, 0)),
+          );
+
+        const hasRemaining = (remainingClues?.count ?? 0) > 0;
+
+        if (hasRemaining) {
+          await tx
+            .update(rounds)
+            .set({ currentPlayerId: nextPlayerId })
+            .where(eq(rounds.id, roundId));
+
+          return {
+            roundId,
+            activePlayerId: nextPlayerId ?? null,
+            questionId,
+            result,
+          } satisfies RoundStatePayload;
+        }
+
         await tx
           .update(rounds)
-          .set({ currentPlayerId: nextPlayerId })
+          .set({
+            currentPlayerId: null,
+            status: "closed",
+          })
           .where(eq(rounds.id, roundId));
+
+        const finalParticipants = await tx
+          .select({
+            userId: roundPlayers.userId,
+            role: roundPlayers.role,
+            score: roundPlayers.score,
+            name: users.name,
+          })
+          .from(roundPlayers)
+          .leftJoin(users, eq(users.id, roundPlayers.userId))
+          .where(eq(roundPlayers.roundId, roundId));
+
+        const playerParticipants = finalParticipants.filter(
+          (participant) => participant.role === "player",
+        );
+
+        const topParticipant =
+          playerParticipants.length > 0
+            ? playerParticipants.reduce(
+                (best, participant) =>
+                  participant.score > best.score ? participant : best,
+                playerParticipants[0],
+              )
+            : null;
+
+        const winner = topParticipant
+          ? {
+              userId: topParticipant.userId,
+              name: topParticipant.name ?? null,
+              score: topParticipant.score ?? 0,
+            }
+          : null;
 
         return {
           roundId,
-          activePlayerId: nextPlayerId ?? null,
+          activePlayerId: null,
+          status: "closed",
           questionId,
           result,
+          winner,
         } satisfies RoundStatePayload;
       },
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,10 +9,17 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { RoundBoardData } from "../page";
+import {
+  isRoundStatus,
+  type RoundStatus,
+  type RoundWinner,
+} from "@/lib/round-status";
 import { useFormAction } from "@/lib/use-form-action";
 import {
   revealClueAction,
@@ -21,6 +29,10 @@ import {
   evaluateClueAction,
   type EvaluateClueState,
 } from "@/actions/rounds/evaluate-clue";
+import {
+  createRoundAction,
+  type CreateRoundState,
+} from "@/actions/rounds/create-round";
 import type {
   RoundEventCluePayload,
   RoundStatePayload,
@@ -43,6 +55,9 @@ type JeopardyBoardProps = {
   data: RoundBoardData;
   roundId: string;
   canSelect: boolean;
+  status: RoundStatus;
+  isHost: boolean;
+  initialWinner: RoundWinner | null;
 };
 
 type ValueTileProps = {
@@ -118,8 +133,12 @@ export default function JeopardyBoard({
   data,
   roundId,
   canSelect,
+  status,
+  isHost,
+  initialWinner,
 }: JeopardyBoardProps) {
   const { categories, clues } = data;
+  const router = useRouter();
 
   const initialRevealedIds = useMemo(
     () =>
@@ -137,6 +156,14 @@ export default function JeopardyBoard({
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [roundStatus, setRoundStatus] = useState<RoundStatus>(status);
+  const [finalWinner, setFinalWinner] = useState<RoundWinner | null>(
+    status === "closed" ? initialWinner : null,
+  );
+  const [resultsDialogOpen, setResultsDialogOpen] = useState(
+    status === "closed",
+  );
+  const [newRoundError, setNewRoundError] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -162,6 +189,15 @@ export default function JeopardyBoard({
     ok: false,
     error: null,
   });
+  const {
+    state: newRoundState,
+    formAction: newRoundAction,
+    pending: newRoundPending,
+  } = useFormAction<CreateRoundState>(createRoundAction, {
+    ok: false,
+    error: "",
+    roundId: undefined,
+  });
 
   const [currentActivePlayerId, setCurrentActivePlayerId] = useState<
     string | null
@@ -170,6 +206,25 @@ export default function JeopardyBoard({
   useEffect(() => {
     setCurrentActivePlayerId(data.currentPlayerId ?? null);
   }, [data.currentPlayerId]);
+
+  useEffect(() => {
+    setRoundStatus(status);
+    if (status === "closed") {
+      setResultsDialogOpen(true);
+      if (initialWinner) {
+        setFinalWinner(initialWinner);
+      }
+    }
+  }, [status, initialWinner]);
+
+  useEffect(() => {
+    if (roundStatus === "closed") {
+      setResultsDialogOpen(true);
+      if (!finalWinner && initialWinner) {
+        setFinalWinner(initialWinner);
+      }
+    }
+  }, [roundStatus, finalWinner, initialWinner]);
 
   useEffect(() => {
     setRevealedIds(new Set(initialRevealedIds));
@@ -181,15 +236,19 @@ export default function JeopardyBoard({
 
   useEffect(() => {
     if (revealState?.ok && revealState.clue) {
+      const revealedQuestionId = revealState.clue.questionId;
       setActiveClue(revealState.clue);
       setDialogOpen(true);
       setErrorMessage(null);
       setRevealedIds((prev) => {
-        if (prev.has(revealState.clue!.questionId)) {
+        if (!revealedQuestionId) {
+          return prev;
+        }
+        if (prev.has(revealedQuestionId)) {
           return prev;
         }
         const next = new Set(prev);
-        next.add(revealState.clue.questionId);
+        next.add(revealedQuestionId);
         return next;
       });
     } else if (revealState?.error) {
@@ -210,6 +269,22 @@ export default function JeopardyBoard({
       setErrorMessage(evaluateState.error);
     }
   }, [evaluateState]);
+
+  useEffect(() => {
+    if (newRoundState?.ok && newRoundState.roundId && isHost) {
+      setNewRoundError(null);
+      setResultsDialogOpen(false);
+      router.push(`/rounds/${newRoundState.roundId}`);
+    } else if (newRoundState?.error) {
+      setNewRoundError(newRoundState.error);
+    }
+  }, [isHost, newRoundState, router]);
+
+  useEffect(() => {
+    if (newRoundPending) {
+      setNewRoundError(null);
+    }
+  }, [newRoundPending]);
 
   useEffect(() => {
     let disposed = false;
@@ -247,6 +322,14 @@ export default function JeopardyBoard({
         const payload = JSON.parse(event.data) as RoundStatePayload;
         if (typeof payload?.activePlayerId !== "undefined") {
           setCurrentActivePlayerId(payload.activePlayerId ?? null);
+        }
+        if (isRoundStatus(payload?.status)) {
+          setRoundStatus(payload.status);
+          if (payload.status === "closed") {
+            setFinalWinner(payload.winner ?? null);
+            setResultsDialogOpen(true);
+            router.refresh();
+          }
         }
         const current = activeClueRef.current;
         if (payload?.questionId && current?.questionId === payload.questionId) {
@@ -352,6 +435,7 @@ export default function JeopardyBoard({
                       interactable={
                         Boolean(questionId) &&
                         canSelect &&
+                        roundStatus === "active" &&
                         !revealed &&
                         pendingQuestionRef.current !== questionId &&
                         !revealPending
@@ -437,6 +521,64 @@ export default function JeopardyBoard({
               </form>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resultsDialogOpen}>
+        <DialogContent showCloseButton={false} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="tracking-wide">Spiel beendet</DialogTitle>
+            <DialogDescription>
+              {finalWinner
+                ? `Gewinner: ${
+                    finalWinner.name && finalWinner.name.length > 0
+                      ? finalWinner.name
+                      : "Unbenannt"
+                  }`
+                : "Es konnte kein Gewinner ermittelt werden."}
+            </DialogDescription>
+          </DialogHeader>
+          {finalWinner ? (
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm text-foreground">
+              <p className="text-base font-semibold text-foreground">
+                {finalWinner.name && finalWinner.name.length > 0
+                  ? finalWinner.name
+                  : "Unbenannt"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Punktestand: {finalWinner.score} Punkte
+              </p>
+            </div>
+          ) : null}
+          {isHost ? (
+            <form action={newRoundAction} className="mt-4 flex flex-col gap-3">
+              <Button
+                type="submit"
+                variant="default"
+                disabled={newRoundPending}
+                onClick={() => setNewRoundError(null)}
+                className="flex items-center justify-center"
+              >
+                {newRoundPending ? "Neue Runde wird erstellt…" : "Neue Runde"}
+              </Button>
+              {newRoundError ? (
+                <p className="text-sm text-destructive">{newRoundError}</p>
+              ) : null}
+            </form>
+          ) : null}
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setResultsDialogOpen(false);
+                router.push("/home");
+              }}
+              className="flex-1"
+            >
+              Beenden
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
