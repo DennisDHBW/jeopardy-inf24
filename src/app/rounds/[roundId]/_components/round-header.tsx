@@ -4,21 +4,35 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Play } from "lucide-react";
+import { Copy, Check, Play, StopCircle, DoorOpen } from "lucide-react";
 import { useFormAction } from "@/lib/use-form-action";
 import {
   startRoundAction,
   type StartRoundState,
 } from "@/actions/rounds/start-round";
 import { isRoundStatus, type RoundStatus } from "@/lib/round-status";
+import {
+  closeRoundAction,
+  type CloseRoundState,
+} from "@/actions/rounds/close-round";
+import {
+  leaveRoundAction,
+  type LeaveRoundState,
+} from "@/actions/rounds/leave-round";
 
 type RoundHeaderProps = {
   status: RoundStatus;
   roundId: string;
   isHost: boolean;
+  canLeave: boolean;
 };
 
-export function RoundHeader({ status, roundId, isHost }: RoundHeaderProps) {
+export function RoundHeader({
+  status,
+  roundId,
+  isHost,
+  canLeave,
+}: RoundHeaderProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<RoundStatus>(status);
@@ -36,6 +50,32 @@ export function RoundHeader({ status, roundId, isHost }: RoundHeaderProps) {
     error: null,
   });
 
+  const {
+    state: closeState,
+    formAction: closeAction,
+    pending: closePending,
+  } = useFormAction<CloseRoundState>(closeRoundAction, {
+    ok: false,
+    error: null,
+  });
+
+  const {
+    state: leaveState,
+    formAction: leaveAction,
+    pending: leavePending,
+  } = useFormAction<LeaveRoundState>(leaveRoundAction, {
+    ok: false,
+    error: null,
+  });
+
+  const hasErrorMessage = Boolean(
+    startState?.error || closeState?.error || leaveState?.error,
+  );
+  const showHostStart = isHost && currentStatus === "idle";
+  const showHostClose = isHost;
+  const showLeave = canLeave;
+  const showActions = showHostStart || showHostClose || showLeave;
+
   useEffect(() => {
     setCurrentStatus(status);
   }, [status]);
@@ -45,6 +85,18 @@ export function RoundHeader({ status, roundId, isHost }: RoundHeaderProps) {
       router.refresh();
     }
   }, [startState?.ok, router]);
+
+  useEffect(() => {
+    if (closeState?.ok) {
+      router.refresh();
+    }
+  }, [closeState?.ok, router]);
+
+  useEffect(() => {
+    if (leaveState?.ok) {
+      router.push("/home");
+    }
+  }, [leaveState?.ok, router]);
 
   useEffect(() => {
     let disposed = false;
@@ -129,9 +181,9 @@ export function RoundHeader({ status, roundId, isHost }: RoundHeaderProps) {
         </Badge>
       </div>
 
-      {isHost ? (
+      {showActions ? (
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-          {currentStatus === "idle" ? (
+          {showHostStart ? (
             <form action={startAction} className="flex items-center gap-2">
               <input type="hidden" name="roundId" value={roundId} />
               <Button
@@ -145,9 +197,42 @@ export function RoundHeader({ status, roundId, isHost }: RoundHeaderProps) {
               </Button>
             </form>
           ) : null}
-          {startState?.error ? (
-            <p className="text-sm text-destructive">{startState.error}</p>
+          {showHostClose ? (
+            <form action={closeAction} className="flex items-center gap-2">
+              <input type="hidden" name="roundId" value={roundId} />
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={closePending || currentStatus === "closed"}
+                className="flex items-center gap-2"
+              >
+                <StopCircle className="size-4" />
+                {closePending ? "Schließt…" : "Runde schließen"}
+              </Button>
+            </form>
           ) : null}
+          {showLeave ? (
+            <form action={leaveAction} className="flex items-center gap-2">
+              <input type="hidden" name="roundId" value={roundId} />
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={leavePending}
+                className="flex items-center gap-2"
+              >
+                <DoorOpen className="size-4" />
+                {leavePending ? "Verlasse…" : "Runde verlassen"}
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+
+      {hasErrorMessage ? (
+        <div className="flex flex-col gap-1 text-sm text-destructive">
+          {startState?.error ? <span>{startState.error}</span> : null}
+          {closeState?.error ? <span>{closeState.error}</span> : null}
+          {leaveState?.error ? <span>{leaveState.error}</span> : null}
         </div>
       ) : null}
 

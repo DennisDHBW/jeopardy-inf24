@@ -17,7 +17,7 @@ import {
 } from "./_components/participants-panel";
 import { RoundHeader } from "./_components/round-header";
 import { UserProfile } from "@/components/user-profile";
-import type { RoundStatus, RoundWinner } from "@/lib/round-status";
+import { determineRoundWinners, type RoundStatus } from "@/lib/round-status";
 
 type BoardCategory = {
   columnIndex: number;
@@ -132,29 +132,6 @@ async function getRoundParticipants(roundId: string): Promise<{
   };
 }
 
-function selectWinner(
-  participants: RoundParticipantView[],
-): RoundWinner | null {
-  const players = participants.filter(
-    (participant) => participant.role === "player",
-  );
-  if (players.length === 0) {
-    return null;
-  }
-
-  const top = players.reduce(
-    (best, participant) =>
-      participant.score > best.score ? participant : best,
-    players[0],
-  );
-
-  return {
-    userId: top.userId,
-    name: top.name,
-    score: top.score,
-  };
-}
-
 // ⬇️ params ist ein Promise in Next 15
 type PageProps = { params: Promise<{ roundId: string }> };
 
@@ -190,10 +167,10 @@ export default async function RoundPage({ params }: PageProps) {
 
   const isHost = Boolean(currentUserId) && currentUserId === hostId;
 
-  const initialWinner =
+  const initialWinners =
     data.status === "closed"
-      ? selectWinner(participantsData.participants)
-      : null;
+      ? determineRoundWinners(participantsData.participants)
+      : [];
 
   return (
     <div className="w-full overflow-x-auto">
@@ -203,6 +180,7 @@ export default async function RoundPage({ params }: PageProps) {
             status={data.status}
             roundId={roundId}
             isHost={currentUserId === hostId}
+            canLeave={Boolean(currentUserId) && !isHost}
           />
 
           <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -222,7 +200,7 @@ export default async function RoundPage({ params }: PageProps) {
                 canSelect={isHost}
                 status={data.status}
                 isHost={isHost}
-                initialWinner={initialWinner}
+                initialWinners={initialWinners}
               />
             </main>
 

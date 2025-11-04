@@ -32,7 +32,7 @@ export type RoundStatePayload = {
   questionId?: number;
   result?: "correct" | "incorrect";
   status?: "idle" | "active" | "closed";
-  winner?: RoundWinner | null;
+  winners?: RoundWinner[];
 };
 
 export type RoundStateEvent = {

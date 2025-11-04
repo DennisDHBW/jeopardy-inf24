@@ -57,7 +57,7 @@ type JeopardyBoardProps = {
   canSelect: boolean;
   status: RoundStatus;
   isHost: boolean;
-  initialWinner: RoundWinner | null;
+  initialWinners: RoundWinner[];
 };
 
 type ValueTileProps = {
@@ -135,7 +135,7 @@ export default function JeopardyBoard({
   canSelect,
   status,
   isHost,
-  initialWinner,
+  initialWinners,
 }: JeopardyBoardProps) {
   const { categories, clues } = data;
   const router = useRouter();
@@ -157,8 +157,8 @@ export default function JeopardyBoard({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [roundStatus, setRoundStatus] = useState<RoundStatus>(status);
-  const [finalWinner, setFinalWinner] = useState<RoundWinner | null>(
-    status === "closed" ? initialWinner : null,
+  const [finalWinners, setFinalWinners] = useState<RoundWinner[]>(
+    status === "closed" ? initialWinners : [],
   );
   const [resultsDialogOpen, setResultsDialogOpen] = useState(
     status === "closed",
@@ -211,20 +211,20 @@ export default function JeopardyBoard({
     setRoundStatus(status);
     if (status === "closed") {
       setResultsDialogOpen(true);
-      if (initialWinner) {
-        setFinalWinner(initialWinner);
+      if (initialWinners.length > 0) {
+        setFinalWinners(initialWinners);
       }
     }
-  }, [status, initialWinner]);
+  }, [status, initialWinners]);
 
   useEffect(() => {
     if (roundStatus === "closed") {
       setResultsDialogOpen(true);
-      if (!finalWinner && initialWinner) {
-        setFinalWinner(initialWinner);
+      if (finalWinners.length === 0 && initialWinners.length > 0) {
+        setFinalWinners(initialWinners);
       }
     }
-  }, [roundStatus, finalWinner, initialWinner]);
+  }, [roundStatus, finalWinners.length, initialWinners]);
 
   useEffect(() => {
     setRevealedIds(new Set(initialRevealedIds));
@@ -286,6 +286,14 @@ export default function JeopardyBoard({
     }
   }, [newRoundPending]);
 
+  const hasWinners = finalWinners.length > 0;
+  const winnerLabel = finalWinners.length > 1 ? "Gewinner:innen" : "Gewinner";
+  const winnerNames = finalWinners
+    .map((winner) =>
+      winner.name && winner.name.length > 0 ? winner.name : "Unbenannt",
+    )
+    .join(", ");
+
   useEffect(() => {
     let disposed = false;
 
@@ -326,9 +334,10 @@ export default function JeopardyBoard({
         if (isRoundStatus(payload?.status)) {
           setRoundStatus(payload.status);
           if (payload.status === "closed") {
-            setFinalWinner(payload.winner ?? null);
+            setFinalWinners(
+              Array.isArray(payload.winners) ? payload.winners : [],
+            );
             setResultsDialogOpen(true);
-            router.refresh();
           }
         }
         const current = activeClueRef.current;
@@ -529,25 +538,34 @@ export default function JeopardyBoard({
           <DialogHeader>
             <DialogTitle className="tracking-wide">Spiel beendet</DialogTitle>
             <DialogDescription>
-              {finalWinner
-                ? `Gewinner: ${
-                    finalWinner.name && finalWinner.name.length > 0
-                      ? finalWinner.name
-                      : "Unbenannt"
-                  }`
+              {hasWinners
+                ? `${winnerLabel}: ${winnerNames}`
                 : "Es konnte kein Gewinner ermittelt werden."}
             </DialogDescription>
           </DialogHeader>
-          {finalWinner ? (
+          {hasWinners ? (
             <div className="rounded-lg border border-border/60 bg-muted/40 p-4 text-sm text-foreground">
-              <p className="text-base font-semibold text-foreground">
-                {finalWinner.name && finalWinner.name.length > 0
-                  ? finalWinner.name
-                  : "Unbenannt"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Punktestand: {finalWinner.score} Punkte
-              </p>
+              <ul className="space-y-2">
+                {finalWinners.map((winner) => {
+                  const displayName =
+                    winner.name && winner.name.length > 0
+                      ? winner.name
+                      : "Unbenannt";
+                  return (
+                    <li
+                      key={winner.userId}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="font-semibold text-foreground">
+                        {displayName}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {winner.score} Punkte
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           ) : null}
           {isHost ? (

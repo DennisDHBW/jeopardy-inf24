@@ -19,6 +19,7 @@ import {
   emitRoundStateChange,
   type RoundStatePayload,
 } from "@/lib/round_events";
+import { determineRoundWinners } from "@/lib/round-status";
 
 const EvaluateClueSchema = z.object({
   roundId: z.string().uuid("Ungültige Runde."),
@@ -249,26 +250,14 @@ export async function evaluateClueAction(
           .leftJoin(users, eq(users.id, roundPlayers.userId))
           .where(eq(roundPlayers.roundId, roundId));
 
-        const playerParticipants = finalParticipants.filter(
-          (participant) => participant.role === "player",
+        const winners = determineRoundWinners(
+          finalParticipants.map((participant) => ({
+            userId: participant.userId,
+            name: participant.name ?? null,
+            role: participant.role === "host" ? "host" : "player",
+            score: participant.score ?? 0,
+          })),
         );
-
-        const topParticipant =
-          playerParticipants.length > 0
-            ? playerParticipants.reduce(
-                (best, participant) =>
-                  participant.score > best.score ? participant : best,
-                playerParticipants[0],
-              )
-            : null;
-
-        const winner = topParticipant
-          ? {
-              userId: topParticipant.userId,
-              name: topParticipant.name ?? null,
-              score: topParticipant.score ?? 0,
-            }
-          : null;
 
         return {
           roundId,
@@ -276,7 +265,7 @@ export async function evaluateClueAction(
           status: "closed",
           questionId,
           result,
-          winner,
+          winners,
         } satisfies RoundStatePayload;
       },
     );
